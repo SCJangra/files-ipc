@@ -58,7 +58,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "files_stdio"
+name = "files-ipc"
 version = "0.1.0"
 dependencies = [
  "anyhow",
