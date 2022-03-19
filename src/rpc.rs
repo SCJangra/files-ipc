@@ -27,6 +27,9 @@ pub trait Rpc {
 
     #[rpc(name = "delete_dir")]
     fn delete_dir(&self, id: FileId) -> JrpcFutResult<bool>;
+
+    #[rpc(name = "rename")]
+    fn rename(&self, id: FileId, new_name: String) -> JrpcFutResult<FileId>;
 }
 
 pub struct RpcImpl {}
@@ -71,6 +74,13 @@ impl Rpc for RpcImpl {
         Box::pin(async move {
             let res = lib::delete_dir(&id).map_err(to_rpc_err).await?;
             Ok(res)
+        })
+    }
+
+    fn rename(&self, id: FileId, new_name: String) -> JrpcFutResult<FileId> {
+        Box::pin(async move {
+            let id = lib::rename(&id, &new_name).map_err(to_rpc_err).await?;
+            Ok(id)
         })
     }
 }
