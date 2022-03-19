@@ -30,6 +30,9 @@ pub trait Rpc {
 
     #[rpc(name = "rename")]
     fn rename(&self, id: FileId, new_name: String) -> JrpcFutResult<FileId>;
+
+    #[rpc(name = "move")]
+    fn move_file(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileId>;
 }
 
 pub struct RpcImpl {}
@@ -80,6 +83,13 @@ impl Rpc for RpcImpl {
     fn rename(&self, id: FileId, new_name: String) -> JrpcFutResult<FileId> {
         Box::pin(async move {
             let id = lib::rename(&id, &new_name).map_err(to_rpc_err).await?;
+            Ok(id)
+        })
+    }
+
+    fn move_file(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileId> {
+        Box::pin(async move {
+            let id = lib::move_file(&file, &dest_dir).map_err(to_rpc_err).await?;
             Ok(id)
         })
     }
