@@ -21,10 +21,10 @@ pub trait Rpc {
     fn list_meta(&self, id: FileId) -> JrpcFutResult<Vec<FileMeta>>;
 
     #[rpc(name = "create_file")]
-    fn create_file(&self, name: String, dir: FileId) -> JrpcFutResult<FileId>;
+    fn create_file(&self, name: String, dir: FileId) -> JrpcFutResult<FileMeta>;
 
     #[rpc(name = "create_dir")]
-    fn create_dir(&self, name: String, dir: FileId) -> JrpcFutResult<FileId>;
+    fn create_dir(&self, name: String, dir: FileId) -> JrpcFutResult<FileMeta>;
 
     #[rpc(name = "delete_file")]
     fn delete_file(&self, id: FileId) -> JrpcFutResult<bool>;
@@ -33,10 +33,10 @@ pub trait Rpc {
     fn delete_dir(&self, id: FileId) -> JrpcFutResult<bool>;
 
     #[rpc(name = "rename")]
-    fn rename(&self, id: FileId, new_name: String) -> JrpcFutResult<FileId>;
+    fn rename(&self, id: FileId, new_name: String) -> JrpcFutResult<FileMeta>;
 
     #[rpc(name = "move")]
-    fn move_file(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileId>;
+    fn move_file(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileMeta>;
 
     #[pubsub(subscription = "copy_file", subscribe, name = "copy_file")]
     fn copy_file(
@@ -72,17 +72,23 @@ impl Rpc for RpcImpl {
         })
     }
 
-    fn create_file(&self, name: String, dir: FileId) -> JrpcFutResult<FileId> {
+    fn create_file(&self, name: String, dir: FileId) -> JrpcFutResult<FileMeta> {
         Box::pin(async move {
-            let id = lib::create_file(&name, &dir).map_err(to_rpc_err).await?;
-            Ok(id)
+            let m = lib::create_file(&name, &dir)
+                .and_then(|id| async move { lib::get_meta(&id).await })
+                .map_err(to_rpc_err)
+                .await?;
+            Ok(m)
         })
     }
 
-    fn create_dir(&self, name: String, dir: FileId) -> JrpcFutResult<FileId> {
+    fn create_dir(&self, name: String, dir: FileId) -> JrpcFutResult<FileMeta> {
         Box::pin(async move {
-            let id = lib::create_dir(&name, &dir).map_err(to_rpc_err).await?;
-            Ok(id)
+            let m = lib::create_dir(&name, &dir)
+                .and_then(|id| async move { lib::get_meta(&id).await })
+                .map_err(to_rpc_err)
+                .await?;
+            Ok(m)
         })
     }
 
@@ -100,17 +106,23 @@ impl Rpc for RpcImpl {
         })
     }
 
-    fn rename(&self, id: FileId, new_name: String) -> JrpcFutResult<FileId> {
+    fn rename(&self, id: FileId, new_name: String) -> JrpcFutResult<FileMeta> {
         Box::pin(async move {
-            let id = lib::rename(&id, &new_name).map_err(to_rpc_err).await?;
-            Ok(id)
+            let m = lib::rename(&id, &new_name)
+                .and_then(|id| async move { lib::get_meta(&id).await })
+                .map_err(to_rpc_err)
+                .await?;
+            Ok(m)
         })
     }
 
-    fn move_file(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileId> {
+    fn move_file(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileMeta> {
         Box::pin(async move {
-            let id = lib::move_file(&file, &dest_dir).map_err(to_rpc_err).await?;
-            Ok(id)
+            let m = lib::move_file(&file, &dest_dir)
+                .and_then(|id| async move { lib::get_meta(&id).await })
+                .map_err(to_rpc_err)
+                .await?;
+            Ok(m)
         })
     }
 
