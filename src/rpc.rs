@@ -38,19 +38,18 @@ pub trait Rpc {
     #[rpc(name = "move")]
     fn move_file(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileMeta>;
 
-    #[pubsub(subscription = "copy_file", subscribe, name = "copy_file")]
-    fn copy_file(
+    #[pubsub(subscription = "copy", subscribe, name = "copy")]
+    fn copy(
         &self,
         m: Self::Metadata,
-        sub: pst::Subscriber<Option<Progress>>,
-        file: FileId,
-        dst_dir: FileId,
+        sub: pst::Subscriber<Option<CopyProg>>,
+        files: Vec<FileMeta>,
+        dst_dir: FileMeta,
         prog_interval: Option<u128>,
     );
 
-    #[pubsub(subscription = "copy_file", unsubscribe, name = "copy_file_c")]
-    fn copy_file_c(&self, m: Option<Self::Metadata>, id: ps::SubscriptionId)
-        -> JrpcFutResult<bool>;
+    #[pubsub(subscription = "copy", unsubscribe, name = "copy_c")]
+    fn copy_c(&self, m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool>;
 }
 
 pub struct RpcImpl {}
@@ -126,16 +125,16 @@ impl Rpc for RpcImpl {
         })
     }
 
-    fn copy_file(
+    fn copy(
         &self,
         _m: Self::Metadata,
-        sub: pst::Subscriber<Option<Progress>>,
-        file: FileId,
-        dst_dir: FileId,
+        sub: pst::Subscriber<Option<CopyProg>>,
+        files: Vec<FileMeta>,
+        dst: FileMeta,
         prog_interval: Option<u128>,
     ) {
         task::spawn(fun::run(sub, move |sink| async move {
-            let res = fun::copy_file(sink, file, dst_dir, prog_interval).await;
+            let res = fun::copy(sink, files, dst, prog_interval).await;
 
             if let Err(_e) = res {
                 // TODO: log this error
@@ -143,11 +142,7 @@ impl Rpc for RpcImpl {
         }));
     }
 
-    fn copy_file_c(
-        &self,
-        _m: Option<Self::Metadata>,
-        id: ps::SubscriptionId,
-    ) -> JrpcFutResult<bool> {
+    fn copy_c(&self, _m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool> {
         Box::pin(fun::sub_c(id))
     }
 }

@@ -4,8 +4,9 @@ use files::{fun as lib, types::*};
 use futures::{self as futs, StreamExt, TryStreamExt};
 use jsonrpc_core as jrpc;
 use jsonrpc_pubsub::{self as ps, manager::IdProvider, typed as pst};
-use std::{collections as cl, time};
+use std::{collections as cl, sync::Arc, time};
 use tokio::{sync, task};
+use unwrap_or::unwrap_ok_or;
 
 pub async fn list_meta(id: FileId) -> AnyResult<Vec<FileMeta>> {
     let mut dirs = vec![];
@@ -100,37 +101,35 @@ pub async fn sub_c(id: ps::SubscriptionId) -> jrpc::Result<bool> {
     }
 }
 
-pub async fn copy_file(
-    sink: pst::Sink<Option<Progress>>,
-    file: FileId,
-    dst_dir: FileId,
+pub async fn copy(
+    sink: pst::Sink<Option<CopyProg>>,
+    files: Vec<FileMeta>,
+    dst: FileMeta,
     prog_interval: Option<u128>,
 ) -> anyhow::Result<()> {
-    let s = match lib::copy_file(&file, &dst_dir).await {
-        Err(e) => {
-            notify_err!(sink, to_rpc_err(e))?;
-            return Ok(());
-        }
-        Ok(r) => r,
-    };
+    let files = files.into_iter().map(Arc::new).collect();
+    let dst = Arc::new(dst);
 
     let prog_interval = prog_interval.unwrap_or(1000);
     let mut instant = time::Instant::now();
 
-    s.map(|res| match res {
-        Err(e) => notify_err!(sink, to_rpc_err(e)),
-        Ok(p) => {
-            let is_done = p.total <= p.done;
+    lib::copy(files, dst)
+        .await
+        .map(|res| {
+            let p = unwrap_ok_or!(res, e, {
+                return notify_err!(sink, to_rpc_err(e));
+            });
+
+            let is_done = p.size.total == p.size.done;
             if instant.elapsed().as_millis() < prog_interval && !is_done {
                 return Ok(());
             }
             instant = time::Instant::now();
             notify_ok!(sink, Some(p))
-        }
-    })
-    .try_for_each(|_| async { Ok(()) })
-    .await
-    .and_then(|_| notify_ok!(sink, None))?;
+        })
+        .try_for_each(|_| async { Ok(()) })
+        .await
+        .and_then(|_| notify_ok!(sink, None))?;
 
     Ok(())
 }
