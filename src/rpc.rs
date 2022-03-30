@@ -62,6 +62,17 @@ pub trait Rpc {
 
     #[pubsub(subscription = "move", unsubscribe, name = "move_c")]
     fn mv_c(&self, m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool>;
+
+    #[pubsub(subscription = "delete", subscribe, name = "delete")]
+    fn delete(
+        &self,
+        m: Self::Metadata,
+        sub: pst::Subscriber<Option<Progress>>,
+        files: Vec<FileMeta>,
+    );
+
+    #[pubsub(subscription = "delete", unsubscribe, name = "delete_c")]
+    fn delete_c(&self, m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool>;
 }
 
 pub struct RpcImpl {}
@@ -175,6 +186,25 @@ impl Rpc for RpcImpl {
     }
 
     fn mv_c(&self, _m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool> {
+        Box::pin(fun::sub_c(id))
+    }
+
+    fn delete(
+        &self,
+        _m: Self::Metadata,
+        sub: pst::Subscriber<Option<Progress>>,
+        files: Vec<FileMeta>,
+    ) {
+        task::spawn(fun::run(sub, move |sink| async move {
+            let res = fun::delete(sink, files).await;
+
+            if let Err(_e) = res {
+                // TODO: log this error
+            }
+        }));
+    }
+
+    fn delete_c(&self, _m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool> {
         Box::pin(fun::sub_c(id))
     }
 }

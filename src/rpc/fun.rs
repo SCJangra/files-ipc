@@ -139,7 +139,22 @@ pub async fn mv(
     for r in lib_ext::mv(&files[..], &dst) {
         let p = unwrap_ok_or!(r, e, {
             notify_err!(sink, to_rpc_err(e))?;
-            break;
+            continue;
+        });
+
+        notify_ok!(sink, Some(p))?;
+    }
+    notify_ok!(sink, None)?;
+
+    Ok(())
+}
+
+pub async fn delete(sink: pst::Sink<Option<Progress>>, files: Vec<FileMeta>) -> anyhow::Result<()> {
+    #[for_await]
+    for r in lib_ext::delete(&files[..]) {
+        let p = unwrap_ok_or!(r, e, {
+            notify_err!(sink, to_rpc_err(e))?;
+            continue;
         });
 
         notify_ok!(sink, Some(p))?;

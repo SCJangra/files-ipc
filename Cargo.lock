@@ -47,7 +47,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 [[package]]
 name = "files"
 version = "0.1.0"
-source = "git+https://github.com/SCJangra/files.git#5b0fc7001b338cc2bfa8b9d44777c1d2cf9b5d5e"
+source = "git+https://github.com/SCJangra/files.git#07397b573c05d1ae502ce3f7f6d2324d378abf9d"
 dependencies = [
  "anyhow",
  "futures",
