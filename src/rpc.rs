@@ -50,6 +50,18 @@ pub trait Rpc {
 
     #[pubsub(subscription = "copy", unsubscribe, name = "copy_c")]
     fn copy_c(&self, m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool>;
+
+    #[pubsub(subscription = "move", subscribe, name = "move")]
+    fn mv(
+        &self,
+        m: Self::Metadata,
+        sub: pst::Subscriber<Option<FileMeta>>,
+        files: Vec<FileMeta>,
+        dst_dir: FileMeta,
+    );
+
+    #[pubsub(subscription = "move", unsubscribe, name = "move_c")]
+    fn mv_c(&self, m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool>;
 }
 
 pub struct RpcImpl {}
@@ -143,6 +155,26 @@ impl Rpc for RpcImpl {
     }
 
     fn copy_c(&self, _m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool> {
+        Box::pin(fun::sub_c(id))
+    }
+
+    fn mv(
+        &self,
+        _m: Self::Metadata,
+        sub: pst::Subscriber<Option<FileMeta>>,
+        files: Vec<FileMeta>,
+        dst: FileMeta,
+    ) {
+        task::spawn(fun::run(sub, move |sink| async move {
+            let res = fun::mv(sink, files, dst).await;
+
+            if let Err(_e) = res {
+                // TODO: log this error
+            }
+        }));
+    }
+
+    fn mv_c(&self, _m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool> {
         Box::pin(fun::sub_c(id))
     }
 }

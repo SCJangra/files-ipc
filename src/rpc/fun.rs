@@ -1,10 +1,11 @@
 use super::types::*;
 use crate::{notify_err, notify_ok, utils::*};
-use files::{fun as lib, types::*};
-use futures::{self as futs, StreamExt, TryStreamExt};
+use files::{fun as lib, fun_ext as lib_ext, types::*};
+use futures::{self as futs, TryStreamExt};
+use futures_async_stream::for_await;
 use jsonrpc_core as jrpc;
 use jsonrpc_pubsub::{self as ps, manager::IdProvider, typed as pst};
-use std::{collections as cl, sync::Arc, time};
+use std::{collections as cl, time};
 use tokio::{sync, task};
 use unwrap_or::unwrap_ok_or;
 
@@ -107,29 +108,43 @@ pub async fn copy(
     dst: FileMeta,
     prog_interval: Option<u128>,
 ) -> anyhow::Result<()> {
-    let files = files.into_iter().map(Arc::new).collect();
-    let dst = Arc::new(dst);
-
     let prog_interval = prog_interval.unwrap_or(1000);
     let mut instant = time::Instant::now();
 
-    lib::copy(files, dst)
-        .await
-        .map(|res| {
-            let p = unwrap_ok_or!(res, e, {
-                return notify_err!(sink, to_rpc_err(e));
-            });
+    #[for_await]
+    for r in lib_ext::copy(&files[..], &dst) {
+        let p = unwrap_ok_or!(r, e, {
+            notify_err!(sink, to_rpc_err(e))?;
+            break;
+        });
 
-            let is_done = p.size.total == p.size.done;
-            if instant.elapsed().as_millis() < prog_interval && !is_done {
-                return Ok(());
-            }
-            instant = time::Instant::now();
-            notify_ok!(sink, Some(p))
-        })
-        .try_for_each(|_| async { Ok(()) })
-        .await
-        .and_then(|_| notify_ok!(sink, None))?;
+        let is_done = p.size.total == p.size.done;
+        if instant.elapsed().as_millis() < prog_interval && !is_done {
+            continue;
+        }
+        instant = time::Instant::now();
+        notify_ok!(sink, Some(p))?;
+    }
+    notify_ok!(sink, None)?;
+
+    Ok(())
+}
+
+pub async fn mv(
+    sink: pst::Sink<Option<FileMeta>>,
+    files: Vec<FileMeta>,
+    dst: FileMeta,
+) -> anyhow::Result<()> {
+    #[for_await]
+    for r in lib_ext::mv(&files[..], &dst) {
+        let p = unwrap_ok_or!(r, e, {
+            notify_err!(sink, to_rpc_err(e))?;
+            break;
+        });
+
+        notify_ok!(sink, Some(p))?;
+    }
+    notify_ok!(sink, None)?;
 
     Ok(())
 }
