@@ -84,70 +84,54 @@ impl Rpc for RpcImpl {
     type Metadata = std::sync::Arc<ps::Session>;
 
     fn get_meta(&self, id: FileId) -> JrpcFutResult<FileMeta> {
-        Box::pin(async move {
-            let m = lib::get_meta(&id).map_err(to_rpc_err).await?;
-            Ok(m)
-        })
+        Box::pin(async move { lib::get_meta(&id).map_err(to_rpc_err).await })
     }
 
     fn list_meta(&self, id: FileId) -> JrpcFutResult<Vec<FileMeta>> {
-        Box::pin(async move {
-            let list = fun::list_meta(id).map_err(to_rpc_err).await?;
-            Ok(list)
-        })
+        Box::pin(async move { fun::list_meta(id).map_err(to_rpc_err).await })
     }
 
     fn create_file(&self, name: String, dir: FileId) -> JrpcFutResult<FileMeta> {
         Box::pin(async move {
-            let m = lib::create_file(&name, &dir)
+            lib::create_file(&name, &dir)
                 .and_then(|id| async move { lib::get_meta(&id).await })
                 .map_err(to_rpc_err)
-                .await?;
-            Ok(m)
+                .await
         })
     }
 
     fn create_dir(&self, name: String, dir: FileId) -> JrpcFutResult<FileMeta> {
         Box::pin(async move {
-            let m = lib::create_dir(&name, &dir)
+            lib::create_dir(&name, &dir)
                 .and_then(|id| async move { lib::get_meta(&id).await })
                 .map_err(to_rpc_err)
-                .await?;
-            Ok(m)
+                .await
         })
     }
 
     fn delete_file(&self, id: FileId) -> JrpcFutResult<bool> {
-        Box::pin(async move {
-            let res = lib::delete_file(&id).map_err(to_rpc_err).await?;
-            Ok(res)
-        })
+        Box::pin(async move { lib::delete_file(&id).map_err(to_rpc_err).await })
     }
 
     fn delete_dir(&self, id: FileId) -> JrpcFutResult<bool> {
-        Box::pin(async move {
-            let res = lib::delete_dir(&id).map_err(to_rpc_err).await?;
-            Ok(res)
-        })
+        Box::pin(async move { lib::delete_dir(&id).map_err(to_rpc_err).await })
     }
 
     fn rename(&self, id: FileId, new_name: String) -> JrpcFutResult<FileMeta> {
         Box::pin(async move {
-            let m = lib::rename(&id, &new_name)
+            lib::rename(&id, &new_name)
                 .and_then(|id| async move { lib::get_meta(&id).await })
                 .map_err(to_rpc_err)
-                .await?;
-            Ok(m)
+                .await
         })
     }
 
     fn move_file(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileMeta> {
         Box::pin(async move {
-            let m = lib::move_file(&file, &dest_dir)
+            lib::move_file(&file, &dest_dir)
                 .and_then(|id| async move { lib::get_meta(&id).await })
                 .map_err(to_rpc_err)
-                .await?;
-            Ok(m)
+                .await
         })
     }
 
