@@ -38,6 +38,9 @@ pub trait Rpc {
     #[rpc(name = "move")]
     fn move_file(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileMeta>;
 
+    #[rpc(name = "get_mime")]
+    fn get_mime(&self, file: FileId) -> JrpcFutResult<String>;
+
     #[pubsub(subscription = "copy", subscribe, name = "copy")]
     fn copy(
         &self,
@@ -146,6 +149,10 @@ impl Rpc for RpcImpl {
                 .await?;
             Ok(m)
         })
+    }
+
+    fn get_mime(&self, file: FileId) -> JrpcFutResult<String> {
+        Box::pin(async move { lib::get_mime(&file).map_err(to_rpc_err).await })
     }
 
     fn copy(
