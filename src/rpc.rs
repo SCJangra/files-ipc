@@ -55,7 +55,7 @@ pub trait Rpc {
     fn mv(
         &self,
         m: Self::Metadata,
-        sub: pst::Subscriber<Option<FileMeta>>,
+        sub: pst::Subscriber<Option<Progress>>,
         files: Vec<FileMeta>,
         dst_dir: FileMeta,
     );
@@ -172,7 +172,7 @@ impl Rpc for RpcImpl {
     fn mv(
         &self,
         _m: Self::Metadata,
-        sub: pst::Subscriber<Option<FileMeta>>,
+        sub: pst::Subscriber<Option<Progress>>,
         files: Vec<FileMeta>,
         dst: FileMeta,
     ) {

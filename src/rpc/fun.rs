@@ -131,7 +131,7 @@ pub async fn copy(
 }
 
 pub async fn mv(
-    sink: pst::Sink<Option<FileMeta>>,
+    sink: pst::Sink<Option<Progress>>,
     files: Vec<FileMeta>,
     dst: FileMeta,
 ) -> anyhow::Result<()> {
