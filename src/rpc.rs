@@ -21,10 +21,10 @@ pub trait Rpc {
     fn list_meta(&self, id: FileId) -> JrpcFutResult<Vec<FileMeta>>;
 
     #[rpc(name = "create_file")]
-    fn create_file(&self, name: String, dir: FileId) -> JrpcFutResult<FileMeta>;
+    fn create_file(&self, name: String, dir: FileId) -> JrpcFutResult<FileId>;
 
     #[rpc(name = "create_dir")]
-    fn create_dir(&self, name: String, dir: FileId) -> JrpcFutResult<FileMeta>;
+    fn create_dir(&self, name: String, dir: FileId) -> JrpcFutResult<FileId>;
 
     #[rpc(name = "delete_file")]
     fn delete_file(&self, id: FileId) -> JrpcFutResult<bool>;
@@ -33,10 +33,10 @@ pub trait Rpc {
     fn delete_dir(&self, id: FileId) -> JrpcFutResult<bool>;
 
     #[rpc(name = "rename")]
-    fn rename(&self, id: FileId, new_name: String) -> JrpcFutResult<FileMeta>;
+    fn rename(&self, id: FileId, new_name: String) -> JrpcFutResult<FileId>;
 
     #[rpc(name = "move")]
-    fn move_file(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileMeta>;
+    fn move_file(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileId>;
 
     #[rpc(name = "get_mime")]
     fn get_mime(&self, file: FileId) -> JrpcFutResult<String>;
@@ -48,7 +48,7 @@ pub trait Rpc {
         sub: pst::Subscriber<Option<CopyProg>>,
         files: Vec<FileMeta>,
         dst_dir: FileMeta,
-        prog_interval: Option<u128>,
+        prog_interval: u128,
     );
 
     #[pubsub(subscription = "copy", unsubscribe, name = "copy_c")]
@@ -91,22 +91,12 @@ impl Rpc for RpcImpl {
         Box::pin(async move { fun::list_meta(id).map_err(to_rpc_err).await })
     }
 
-    fn create_file(&self, name: String, dir: FileId) -> JrpcFutResult<FileMeta> {
-        Box::pin(async move {
-            lib::create_file(&name, &dir)
-                .and_then(|id| async move { lib::get_meta(&id).await })
-                .map_err(to_rpc_err)
-                .await
-        })
+    fn create_file(&self, name: String, dir: FileId) -> JrpcFutResult<FileId> {
+        Box::pin(async move { lib::create_file(&name, &dir).map_err(to_rpc_err).await })
     }
 
-    fn create_dir(&self, name: String, dir: FileId) -> JrpcFutResult<FileMeta> {
-        Box::pin(async move {
-            lib::create_dir(&name, &dir)
-                .and_then(|id| async move { lib::get_meta(&id).await })
-                .map_err(to_rpc_err)
-                .await
-        })
+    fn create_dir(&self, name: String, dir: FileId) -> JrpcFutResult<FileId> {
+        Box::pin(async move { lib::create_dir(&name, &dir).map_err(to_rpc_err).await })
     }
 
     fn delete_file(&self, id: FileId) -> JrpcFutResult<bool> {
@@ -117,22 +107,12 @@ impl Rpc for RpcImpl {
         Box::pin(async move { lib::delete_dir(&id).map_err(to_rpc_err).await })
     }
 
-    fn rename(&self, id: FileId, new_name: String) -> JrpcFutResult<FileMeta> {
-        Box::pin(async move {
-            lib::rename(&id, &new_name)
-                .and_then(|id| async move { lib::get_meta(&id).await })
-                .map_err(to_rpc_err)
-                .await
-        })
+    fn rename(&self, id: FileId, new_name: String) -> JrpcFutResult<FileId> {
+        Box::pin(async move { lib::rename(&id, &new_name).map_err(to_rpc_err).await })
     }
 
-    fn move_file(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileMeta> {
-        Box::pin(async move {
-            lib::move_file(&file, &dest_dir)
-                .and_then(|id| async move { lib::get_meta(&id).await })
-                .map_err(to_rpc_err)
-                .await
-        })
+    fn move_file(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileId> {
+        Box::pin(async move { lib::move_file(&file, &dest_dir).map_err(to_rpc_err).await })
     }
 
     fn get_mime(&self, file: FileId) -> JrpcFutResult<String> {
@@ -145,7 +125,7 @@ impl Rpc for RpcImpl {
         sub: pst::Subscriber<Option<CopyProg>>,
         files: Vec<FileMeta>,
         dst: FileMeta,
-        prog_interval: Option<u128>,
+        prog_interval: u128,
     ) {
         task::spawn(fun::run(sub, move |sink| async move {
             let res = fun::copy(sink, files, dst, prog_interval).await;

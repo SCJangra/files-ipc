@@ -5,7 +5,7 @@ use futures::{self as futs, TryStreamExt};
 use futures_async_stream::for_await;
 use jsonrpc_core as jrpc;
 use jsonrpc_pubsub::{self as ps, manager::IdProvider, typed as pst};
-use std::{collections as cl, time};
+use std::collections as cl;
 use tokio::{sync, task};
 use unwrap_or::unwrap_ok_or;
 
@@ -106,23 +106,15 @@ pub async fn copy(
     sink: pst::Sink<Option<CopyProg>>,
     files: Vec<FileMeta>,
     dst: FileMeta,
-    prog_interval: Option<u128>,
+    prog_interval: u128,
 ) -> anyhow::Result<()> {
-    let prog_interval = prog_interval.unwrap_or(1000);
-    let mut instant = time::Instant::now();
-
     #[for_await]
-    for r in lib_ext::copy(&files[..], &dst) {
+    for r in lib_ext::copy(&files[..], &dst, prog_interval) {
         let p = unwrap_ok_or!(r, e, {
             notify_err!(sink, to_rpc_err(e))?;
             break;
         });
 
-        let is_done = p.size.total == p.size.done;
-        if instant.elapsed().as_millis() < prog_interval && !is_done {
-            continue;
-        }
-        instant = time::Instant::now();
         notify_ok!(sink, Some(p))?;
     }
     notify_ok!(sink, None)?;
