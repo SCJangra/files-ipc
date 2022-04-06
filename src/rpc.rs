@@ -35,7 +35,7 @@ pub trait Rpc {
     #[rpc(name = "rename")]
     fn rename(&self, id: FileId, new_name: String) -> JrpcFutResult<FileId>;
 
-    #[rpc(name = "move")]
+    #[rpc(name = "move_file")]
     fn move_file(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileId>;
 
     #[rpc(name = "get_mime")]
