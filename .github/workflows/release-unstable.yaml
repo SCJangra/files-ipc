@@ -52,14 +52,14 @@ jobs:
       - name: Build
         run: |
           cargo build --release
-          mv ./target/release/files-ipc ./target/release/linux-files-ipc
+          mv ./target/release/files-ipc ./target/release/files-ipc-linux
 
 
       - name: Upload binary
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.TAG_NAME }}
-          files: ./target/release/linux-files-ipc
+          files: ./target/release/files-ipc-linux
 
   windows-build:
     name: Build for windows
@@ -78,10 +78,10 @@ jobs:
       - name: Build
         run: |
           cargo build --release
-          Rename-Item .\target\release\files-ipc.exe windows-files-ipc.exe
+          Rename-Item .\target\release\files-ipc.exe files-ipc-windows.exe
 
       - name: Upload binary
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ env.TAG_NAME }}
-          files: ./target/release/windows-files-ipc.exe
+          files: ./target/release/files-ipc-windows.exe
