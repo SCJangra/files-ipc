@@ -22,6 +22,7 @@ fn main() {
         std::sync::Arc::new(Session::new(request.sender.clone()))
     });
     let server = server_builder.start(&s).expect("Unable to start server");
+    println!("Server started at {}", s);
 
     server.wait()
 }
