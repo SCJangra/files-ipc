@@ -85,3 +85,28 @@ jobs:
         with:
           tag_name: ${{ env.TAG_NAME }}
           files: ./target/release/files-ipc-windows.exe
+
+  macos-build:
+    name: Build for MacOS
+    runs-on: macos-latest
+    needs: release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+
+      - name: Build
+        run: |
+          cargo build --release
+          mv ./target/release/files-ipc ./target/release/files-ipc-macos
+
+      - name: Upload binary
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.TAG_NAME }}
+          files: ./target/release/files-ipc-macos
