@@ -160,7 +160,7 @@ pub async fn delete_all(
 }
 
 pub async fn rename_all(
-    sink: pst::Sink<Option<FileId>>,
+    sink: pst::Sink<Option<Progress>>,
     rn: Vec<(FileMeta, String)>,
 ) -> anyhow::Result<()> {
     #[for_await]

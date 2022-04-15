@@ -45,7 +45,7 @@ pub trait Rpc {
     fn rename_all(
         &self,
         m: Self::Metadata,
-        sub: pst::Subscriber<Option<FileId>>,
+        sub: pst::Subscriber<Option<Progress>>,
         rn: Vec<(FileMeta, String)>,
     );
 
@@ -141,7 +141,7 @@ impl Rpc for RpcImpl {
     fn rename_all(
         &self,
         _m: Self::Metadata,
-        sub: pst::Subscriber<Option<FileId>>,
+        sub: pst::Subscriber<Option<Progress>>,
         rn: Vec<(FileMeta, String)>,
     ) {
         task::spawn(fun::run(sub, move |sink| async move {
