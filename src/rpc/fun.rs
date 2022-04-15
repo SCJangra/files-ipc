@@ -102,14 +102,14 @@ pub async fn sub_c(id: ps::SubscriptionId) -> jrpc::Result<bool> {
     }
 }
 
-pub async fn copy(
+pub async fn copy_all(
     sink: pst::Sink<Option<CopyProg>>,
     files: Vec<FileMeta>,
     dst: FileMeta,
     prog_interval: u128,
 ) -> anyhow::Result<()> {
     #[for_await]
-    for r in lib_ext::copy(&files[..], &dst, prog_interval) {
+    for r in lib_ext::copy_all(&files[..], &dst, prog_interval) {
         let p = unwrap_ok_or!(r, e, {
             notify_err!(sink, to_rpc_err(e))?;
             break;
@@ -122,13 +122,13 @@ pub async fn copy(
     Ok(())
 }
 
-pub async fn mv(
+pub async fn mv_all(
     sink: pst::Sink<Option<Progress>>,
     files: Vec<FileMeta>,
     dst: FileMeta,
 ) -> anyhow::Result<()> {
     #[for_await]
-    for r in lib_ext::mv(&files[..], &dst) {
+    for r in lib_ext::mv_all(&files[..], &dst) {
         let p = unwrap_ok_or!(r, e, {
             notify_err!(sink, to_rpc_err(e))?;
             continue;
@@ -141,9 +141,30 @@ pub async fn mv(
     Ok(())
 }
 
-pub async fn delete(sink: pst::Sink<Option<Progress>>, files: Vec<FileMeta>) -> anyhow::Result<()> {
+pub async fn delete_all(
+    sink: pst::Sink<Option<Progress>>,
+    files: Vec<FileMeta>,
+) -> anyhow::Result<()> {
     #[for_await]
-    for r in lib_ext::delete(&files[..]) {
+    for r in lib_ext::delete_all(&files[..]) {
+        let p = unwrap_ok_or!(r, e, {
+            notify_err!(sink, to_rpc_err(e))?;
+            continue;
+        });
+
+        notify_ok!(sink, Some(p))?;
+    }
+    notify_ok!(sink, None)?;
+
+    Ok(())
+}
+
+pub async fn rename_all(
+    sink: pst::Sink<Option<FileId>>,
+    rn: Vec<(FileMeta, String)>,
+) -> anyhow::Result<()> {
+    #[for_await]
+    for r in lib_ext::rename_all(&rn[..]) {
         let p = unwrap_ok_or!(r, e, {
             notify_err!(sink, to_rpc_err(e))?;
             continue;

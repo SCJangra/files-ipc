@@ -35,14 +35,29 @@ pub trait Rpc {
     #[rpc(name = "rename")]
     fn rename(&self, id: FileId, new_name: String) -> JrpcFutResult<FileId>;
 
-    #[rpc(name = "move_file")]
-    fn move_file(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileId>;
+    #[rpc(name = "mv")]
+    fn mv(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileId>;
 
     #[rpc(name = "get_mime")]
     fn get_mime(&self, file: FileId) -> JrpcFutResult<String>;
 
-    #[pubsub(subscription = "copy", subscribe, name = "copy")]
-    fn copy(
+    #[pubsub(subscription = "rename_all", subscribe, name = "rename_all")]
+    fn rename_all(
+        &self,
+        m: Self::Metadata,
+        sub: pst::Subscriber<Option<FileId>>,
+        rn: Vec<(FileMeta, String)>,
+    );
+
+    #[pubsub(subscription = "rename_all", unsubscribe, name = "rename_all_c")]
+    fn rename_all_c(
+        &self,
+        m: Option<Self::Metadata>,
+        id: ps::SubscriptionId,
+    ) -> JrpcFutResult<bool>;
+
+    #[pubsub(subscription = "copy_all", subscribe, name = "copy_all")]
+    fn copy_all(
         &self,
         m: Self::Metadata,
         sub: pst::Subscriber<Option<CopyProg>>,
@@ -51,11 +66,11 @@ pub trait Rpc {
         prog_interval: u128,
     );
 
-    #[pubsub(subscription = "copy", unsubscribe, name = "copy_c")]
-    fn copy_c(&self, m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool>;
+    #[pubsub(subscription = "copy_all", unsubscribe, name = "copy_all_c")]
+    fn copy_all_c(&self, m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool>;
 
-    #[pubsub(subscription = "move", subscribe, name = "move")]
-    fn mv(
+    #[pubsub(subscription = "mv_all", subscribe, name = "mv_all")]
+    fn mv_all(
         &self,
         m: Self::Metadata,
         sub: pst::Subscriber<Option<Progress>>,
@@ -63,19 +78,23 @@ pub trait Rpc {
         dst_dir: FileMeta,
     );
 
-    #[pubsub(subscription = "move", unsubscribe, name = "move_c")]
-    fn mv_c(&self, m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool>;
+    #[pubsub(subscription = "mv_all", unsubscribe, name = "mv_all_c")]
+    fn mv_all_c(&self, m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool>;
 
-    #[pubsub(subscription = "delete", subscribe, name = "delete")]
-    fn delete(
+    #[pubsub(subscription = "delete_all", subscribe, name = "delete_all")]
+    fn delete_all(
         &self,
         m: Self::Metadata,
         sub: pst::Subscriber<Option<Progress>>,
         files: Vec<FileMeta>,
     );
 
-    #[pubsub(subscription = "delete", unsubscribe, name = "delete_c")]
-    fn delete_c(&self, m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool>;
+    #[pubsub(subscription = "delete_all", unsubscribe, name = "delete_all_c")]
+    fn delete_all_c(
+        &self,
+        m: Option<Self::Metadata>,
+        id: ps::SubscriptionId,
+    ) -> JrpcFutResult<bool>;
 }
 
 pub struct RpcImpl {}
@@ -111,15 +130,38 @@ impl Rpc for RpcImpl {
         Box::pin(async move { lib::rename(&id, &new_name).map_err(to_rpc_err).await })
     }
 
-    fn move_file(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileId> {
-        Box::pin(async move { lib::move_file(&file, &dest_dir).map_err(to_rpc_err).await })
+    fn mv(&self, file: FileId, dest_dir: FileId) -> JrpcFutResult<FileId> {
+        Box::pin(async move { lib::mv(&file, &dest_dir).map_err(to_rpc_err).await })
     }
 
     fn get_mime(&self, file: FileId) -> JrpcFutResult<String> {
         Box::pin(async move { lib::get_mime(&file).map_err(to_rpc_err).await })
     }
 
-    fn copy(
+    fn rename_all(
+        &self,
+        _m: Self::Metadata,
+        sub: pst::Subscriber<Option<FileId>>,
+        rn: Vec<(FileMeta, String)>,
+    ) {
+        task::spawn(fun::run(sub, move |sink| async move {
+            let res = fun::rename_all(sink, rn).await;
+
+            if let Err(_e) = res {
+                // TODO: log this error
+            }
+        }));
+    }
+
+    fn rename_all_c(
+        &self,
+        _m: Option<Self::Metadata>,
+        id: ps::SubscriptionId,
+    ) -> JrpcFutResult<bool> {
+        Box::pin(fun::sub_c(id))
+    }
+
+    fn copy_all(
         &self,
         _m: Self::Metadata,
         sub: pst::Subscriber<Option<CopyProg>>,
@@ -128,7 +170,7 @@ impl Rpc for RpcImpl {
         prog_interval: u128,
     ) {
         task::spawn(fun::run(sub, move |sink| async move {
-            let res = fun::copy(sink, files, dst, prog_interval).await;
+            let res = fun::copy_all(sink, files, dst, prog_interval).await;
 
             if let Err(_e) = res {
                 // TODO: log this error
@@ -136,11 +178,15 @@ impl Rpc for RpcImpl {
         }));
     }
 
-    fn copy_c(&self, _m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool> {
+    fn copy_all_c(
+        &self,
+        _m: Option<Self::Metadata>,
+        id: ps::SubscriptionId,
+    ) -> JrpcFutResult<bool> {
         Box::pin(fun::sub_c(id))
     }
 
-    fn mv(
+    fn mv_all(
         &self,
         _m: Self::Metadata,
         sub: pst::Subscriber<Option<Progress>>,
@@ -148,7 +194,7 @@ impl Rpc for RpcImpl {
         dst: FileMeta,
     ) {
         task::spawn(fun::run(sub, move |sink| async move {
-            let res = fun::mv(sink, files, dst).await;
+            let res = fun::mv_all(sink, files, dst).await;
 
             if let Err(_e) = res {
                 // TODO: log this error
@@ -156,18 +202,18 @@ impl Rpc for RpcImpl {
         }));
     }
 
-    fn mv_c(&self, _m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool> {
+    fn mv_all_c(&self, _m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool> {
         Box::pin(fun::sub_c(id))
     }
 
-    fn delete(
+    fn delete_all(
         &self,
         _m: Self::Metadata,
         sub: pst::Subscriber<Option<Progress>>,
         files: Vec<FileMeta>,
     ) {
         task::spawn(fun::run(sub, move |sink| async move {
-            let res = fun::delete(sink, files).await;
+            let res = fun::delete_all(sink, files).await;
 
             if let Err(_e) = res {
                 // TODO: log this error
@@ -175,7 +221,11 @@ impl Rpc for RpcImpl {
         }));
     }
 
-    fn delete_c(&self, _m: Option<Self::Metadata>, id: ps::SubscriptionId) -> JrpcFutResult<bool> {
+    fn delete_all_c(
+        &self,
+        _m: Option<Self::Metadata>,
+        id: ps::SubscriptionId,
+    ) -> JrpcFutResult<bool> {
         Box::pin(fun::sub_c(id))
     }
 }
