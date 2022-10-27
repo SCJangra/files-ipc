@@ -52,6 +52,12 @@ macro_rules! stream_res {
             .try_for_each(|r| async { r })
             .await?;
 
+        let r = Response::new($id, RpcResult::Ok(serde_json::Value::Null));
+        let v = serde_json::to_vec(&r).with_context(|| format!("could not serialize `{r:?}`"))?;
+        $res_sender
+            .send(v)
+            .with_context(|| format!("response channel closed"))?;
+
         remove_req!($id);
 
         Ok(())
