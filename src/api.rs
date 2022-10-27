@@ -20,15 +20,11 @@ lazy_static::lazy_static! {
 macro_rules! res {
     ($res_sender: expr, $id: expr, $fut: expr) => {{
         let res = $fut.map(|r| Response::new($id, r.into())).await;
-        tokio::task::spawn_blocking(move || {
-            let res = serde_json::to_vec(&res)
-                .with_context(|| format!("could not serialize `{res:?}`"))?;
-            $res_sender
-                .send(res)
-                .with_context(|| format!("response channel closed"))?;
-            anyhow::Ok(())
-        })
-        .await??;
+        let res =
+            serde_json::to_vec(&res).with_context(|| format!("could not serialize `{res:?}`"))?;
+        $res_sender
+            .send(res)
+            .with_context(|| format!("response channel closed"))?;
 
         remove_req!($id);
 
