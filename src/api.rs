@@ -1,10 +1,21 @@
+use std::collections::HashMap;
+
 use anyhow::{anyhow, Context, Result};
 use files::File;
 use futures::{FutureExt, StreamExt, TryStreamExt};
-use tokio::sync::mpsc::UnboundedSender;
+use tokio::{
+    sync::{mpsc::UnboundedSender, RwLock},
+    task::JoinHandle,
+};
 
 use crate::types::*;
 use Function::*;
+
+type ReqHandel = JoinHandle<Result<()>>;
+
+lazy_static::lazy_static! {
+    pub static ref REQUESTS: RwLock<HashMap<usize, ReqHandel>> = RwLock::new(HashMap::<usize, ReqHandel>::new());
+}
 
 macro_rules! res {
     ($res_sender: expr, $id: expr, $fut: expr) => {{
@@ -17,7 +28,11 @@ macro_rules! res {
                 .with_context(|| format!("response channel closed"))?;
             anyhow::Ok(())
         })
-        .await?
+        .await??;
+
+        remove_req!($id);
+
+        Ok(())
     }};
 }
 
@@ -40,7 +55,16 @@ macro_rules! stream_res {
             .map_err(|e| anyhow!("{e}"))
             .try_for_each(|r| async { r })
             .await?;
+
+        remove_req!($id);
+
         Ok(())
+    }};
+}
+
+macro_rules! remove_req {
+    ($id: expr) => {{
+        REQUESTS.write().await.remove(&$id);
     }};
 }
 
@@ -58,5 +82,19 @@ pub async fn do_request(req: Request, res_sender: UnboundedSender<Vec<u8>>) -> R
         MoveToDir { mut file, dir_id } => res!(res_sender, req.id, file.move_to_dir(&dir_id)),
         List { file } => stream_res!(res_sender, req.id, file.list()),
         CopyToDir { file, dir_id } => stream_res!(res_sender, req.id, file.copy_to_dir(&dir_id)),
+        Cancel { id } => cancel_request(req.id, id, res_sender).await,
     }
+}
+
+async fn cancel_request(
+    req_id: usize,
+    id: usize,
+    res_sender: UnboundedSender<Vec<u8>>,
+) -> Result<()> {
+    if let Some(h) = REQUESTS.write().await.remove(&id) {
+        h.abort();
+    }
+    let r = serde_json::to_vec(&Response::new(req_id, RpcResult::Ok(())))?;
+    res_sender.send(r)?;
+    Ok(())
 }

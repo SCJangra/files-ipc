@@ -43,7 +43,12 @@ fn req_handler(
                 .await
                 .ok_or_else(|| anyhow!("request channel closed"))?;
 
-            tokio::spawn(api::do_request(req, res_sender.clone()));
+            let id = req.id;
+
+            let h = tokio::spawn(api::do_request(req, res_sender.clone()));
+            {
+                api::REQUESTS.write().await.insert(id, h);
+            }
         }
 
         #[allow(unreachable_code)]

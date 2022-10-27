@@ -38,6 +38,9 @@ pub enum Function {
         file: File,
         dir_id: FileId,
     },
+    Cancel {
+        id: usize,
+    },
 }
 
 #[derive(Debug, Serialize)]
