@@ -125,7 +125,7 @@ dependencies = [
 [[package]]
 name = "files"
 version = "0.1.0"
-source = "git+https://github.com/SCJangra/files.git#2c1354e176e74bd90da1c8e1135d1b3633d8b9bd"
+source = "git+https://github.com/SCJangra/files.git#b238b477c3605877e35a1384efc549eb354f6a08"
 dependencies = [
  "anyhow",
  "async-stream",
